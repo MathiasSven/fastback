@@ -18,10 +18,18 @@
 
 package net.pcal.fastback.common.mod;
 
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.TextColor;
 import net.pcal.fastback.common.logging.UserMessage;
+
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.text.MessageFormat;
+import java.util.HashMap;
+import java.util.Map;
 
 import static net.minecraft.ChatFormatting.GRAY;
 import static net.minecraft.ChatFormatting.GREEN;
@@ -37,15 +45,50 @@ import static net.minecraft.network.chat.Style.EMPTY;
  */
 public class UserMessageUtil {
 
-    public static Component messageToText(final UserMessage m) {
-        final MutableComponent out;
-        if (m.localized() != null) {
-            out = Component.translatable(
-                m.localized().key(),
-                messageParamsToComponentArgs(m.localized().params())
+    private static final Map<String, String> TRANSLATIONS = new HashMap<>();
+
+    static {
+        loadTranslations();
+    }
+
+    private static void loadTranslations() {
+        try {
+            InputStreamReader reader = new InputStreamReader(
+                UserMessageUtil.class.getResourceAsStream("/assets/fastback/lang/en_us.json")
             );
-        } else {
+            JsonObject json = new Gson().fromJson(reader, JsonObject.class);
+            json.entrySet().forEach(entry ->
+                TRANSLATIONS.put(entry.getKey(), entry.getValue().getAsString())
+            );
+            reader.close();
+        } catch (IOException | NullPointerException e) {
+            // Silently fail if translations can't be loaded
+            // This can happen in edge cases
+        }
+    }
+
+    public static Component messageToText(final UserMessage m) {
+        MutableComponent out;
+        if (m.raw() != null) {
             out = Component.literal(m.raw());
+        } else if (m.localized() != null) {
+            // Look up the translation and format with parameters
+            String template = TRANSLATIONS.get(m.localized().key());
+            if (template != null) {
+                try {
+                    // Convert Java MessageFormat style {0} from %s style if needed
+                    String formatted = formatMessage(template, m.localized().params());
+                    out = Component.literal(formatted);
+                } catch (Exception e) {
+                    // Fallback if formatting fails
+                    out = Component.literal(template);
+                }
+            } else {
+                // Fallback if key not found - show the key so we know what's missing
+                out = Component.literal(m.localized().key());
+            }
+        } else {
+            out = Component.literal("");
         }
         switch (m.style()) {
             case ERROR -> out.setStyle(EMPTY.withColor(TextColor.fromLegacyFormat(RED)));
@@ -56,19 +99,27 @@ public class UserMessageUtil {
         return out;
     }
 
-    private static Object[] messageParamsToComponentArgs(final Object[] params) {
-        if (params == null) return new Object[0];
-
-        final Object[] out = new Object[params.length];
-        for (int i = 0; i < params.length; i++) {
-            final Object param = params[i];
-            if (param instanceof Component) {
-                out[i] = param;
-            } else {
-                out[i] = String.valueOf(param);
+    /**
+     * Format a message template with parameters.
+     * Handles both %s style (old minecraft) and {0} style (MessageFormat)
+     */
+    private static String formatMessage(String template, Object[] params) {
+        if (params == null || params.length == 0) {
+            return template;
+        }
+        
+        // Try %s style formatting first (used in en_us.json)
+        try {
+            return String.format(template, params);
+        } catch (Exception e) {
+            // Fall back to {0} style
+            try {
+                return MessageFormat.format(template, params);
+            } catch (Exception e2) {
+                // If all else fails, return template as-is
+                return template;
             }
         }
-        return out;
     }
 
     private UserMessageUtil() {}

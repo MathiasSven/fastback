@@ -28,14 +28,14 @@ tasks.register('validateRelease') {
 	group = 'release'
 	description = 'Validates that the environment is ready for a release'
 
-	doFirst {
-		if (!System.getenv("CURSEFORGE_TOKEN")) {
-			throw new GradleException("CURSEFORGE_TOKEN environment variable not set")
-		}
-		if (!System.getenv("MODRINTH_TOKEN")) {
-			throw new GradleException("MODRINTH_TOKEN environment variable not set")
-		}
-	}
+	// doFirst {
+	// 	if (!System.getenv("CURSEFORGE_TOKEN")) {
+	// 		throw new GradleException("CURSEFORGE_TOKEN environment variable not set")
+	// 	}
+	// 	if (!System.getenv("MODRINTH_TOKEN")) {
+	// 		throw new GradleException("MODRINTH_TOKEN environment variable not set")
+	// 	}
+	// }
 
 	doLast {
 		// Check git status
@@ -79,7 +79,7 @@ tasks.register('prepareReleaseVersion') {
 			throw new GradleException("Current version is not a prerelease: ${currentVersion}")
 		}
 
-		def releaseVersion = currentVersion.replace('-prerelease', '')
+		def releaseVersion = currentVersion.replace('-prerelease', '') + "-notrans"
 		println "Release version: ${releaseVersion}"
 
 		// Replace the line in the file, preserving everything else
@@ -385,21 +385,21 @@ tasks.register('release') {
 	          prepareReleaseVersion,
 	          commitReleaseVersion,
 	          buildReleaseJars,
-	          publishGitHub,
-	          publishCurseForge,
-	          publishModrinth,
-	          bumpVersion,
-	          commitVersionBump
+	          publishGitHub
+	          // publishCurseForge,
+	          // publishModrinth,
+	          // bumpVersion,
+	          // commitVersionBump
 
 	// Execution order
 	prepareReleaseVersion.mustRunAfter validateRelease
 	commitReleaseVersion.mustRunAfter prepareReleaseVersion
 	buildReleaseJars.mustRunAfter commitReleaseVersion
 	publishGitHub.mustRunAfter buildReleaseJars
-	publishCurseForge.mustRunAfter publishGitHub
-	publishModrinth.mustRunAfter publishCurseForge
-	bumpVersion.mustRunAfter publishModrinth
-	commitVersionBump.mustRunAfter bumpVersion
+	// publishCurseForge.mustRunAfter publishGitHub
+	// publishModrinth.mustRunAfter publishCurseForge
+	// bumpVersion.mustRunAfter publishModrinth
+	// commitVersionBump.mustRunAfter bumpVersion
 
 	doFirst {
 		println ""
